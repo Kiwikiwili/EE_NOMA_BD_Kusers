@@ -53,8 +53,7 @@ for n=1:N
     %for each number of users K
     for i=1:length(K)
         
-        A=(2.^(2*Rmin)).*ones(K(i),1);
-        
+        A=(2^(2*Rmin))*ones(K(i),1);
         %---- generating channel gains ----%
         
         %randomly generate x and y coordinates for users
@@ -93,15 +92,32 @@ for n=1:N
         %---- compute Pmin required for meeting QoS constraints in conventional OMA ----%
         Pmin_OMA_conv=sum((A.^K(i)-1)./G_BS_users);
         
-        %compute Pmin in NOMA with BD and OMA with BD + computing optimal rho 
-        [rho_NOMA,G_NOMA_BD,Pmin_NOMA_BD,G_OMA_BD,Pmin_OMA_BD] = optimal_rho(G_BS_users,G_BS_BD,G_BD_users,A,R);
+        %compute the optimal rho
+        
+        if (isempty(R))
+            rho_NOMA=1;
+        else
+            rho_NOMA=min(1,min(R));
+        end
+        
+        %compute Gamma according to the notations in the paper
+        G_OMA_BD=(G_BS_users+G_BS_BD*G_BD_users).^2;
+        G_NOMA_BD=(G_BS_users+sqrt(rho_NOMA)*G_BS_BD*G_BD_users).^2;
+        
+        %compute Pmin in OMA with BD and NOMA with BD
+        Pmin_OMA_BD=sum((A.^length(G_BS_users)-1)./G_OMA_BD);
+        Pmin_NOMA_BD=0;
+        
+        for j=1:length(G_BS_users)
+            Pmin_NOMA_BD=Pmin_NOMA_BD+(A(j)-1)/G_NOMA_BD(j)*prod(A(j+1:length(G_BS_users)));
+        end
         
         
         %---- checking the feasability condition ----%
         while (Pmin_NOMA_conv>Pmax || Pmin_NOMA_BD>Pmax || Pmin_OMA_BD>Pmax || Pmin_OMA_conv>Pmax)
             
             %repeat generating channel gains until the feasibility condition is met
-            users_location=(a2-a1).*rand(2,K(i))+a1; 
+            users_location=(a2-a1).*rand(2,K(i))+a1;
             BD_location=(b2-b1).*rand(2,1)+b1;
             
             d_BS_BD=sqrt(sum(BD_location.^2));
@@ -120,9 +136,9 @@ for n=1:N
             for j=1:(K(i)-1)
                 Pmin_NOMA_conv=Pmin_NOMA_conv+(A(j)-1)/G_BS_users(j)*prod(A((j+1):K(i)));
             end
+            
             Pmin_OMA_conv=sum((A.^K(i)-1)./G_BS_users);
             
-            %compute the optimal reflection coefficient(rho)
             
             if (isempty(R))
                 rho_NOMA=1;
@@ -130,19 +146,16 @@ for n=1:N
                 rho_NOMA=min(1,min(R));
             end
             
-            %compute Gamma according to the notations in the paper
             G_OMA_BD=(G_BS_users+G_BS_BD*G_BD_users).^2;
             G_NOMA_BD=(G_BS_users+sqrt(rho_NOMA)*G_BS_BD*G_BD_users).^2;
            
-            %compute Pmin in OMA with BD and NOMA with BD
-            Pmin_OMA=sum((A.^length(G_BS_users)-1)./G_OMA_BD);
-            Pmin_NOMA=0;
-            for i=1:length(G_BS_users)
-                Pmin_NOMA=Pmin_NOMA+(A(i)-1)/G_NOMA_BD(i)*prod(A(i+1:length(G_BS_users)));
-            end             
+            Pmin_OMA_BD=sum((A.^length(G_BS_users)-1)./G_OMA_BD);
+            Pmin_NOMA_BD=0;
             
-            %[rho_NOMA,G_NOMA_BD,Pmin_NOMA_BD,G_OMA_BD,Pmin_OMA_BD] = optimal_rho(G_BS_users,G_BS_BD,G_BD_users,A,R);
-            
+            for j=1:length(G_BS_users)
+                Pmin_NOMA_BD=Pmin_NOMA_BD+(A(j)-1)/G_NOMA_BD(j)*prod(A(j+1:length(G_BS_users)));
+            end
+                        
         end
         
         %---- compute the optimal energy efficiency ----% 
@@ -152,7 +165,7 @@ for n=1:N
         EE_OMA_conv = optimal_solution_OMA(G_BS_users,A,Pmax,Pc);
         
         
-        %---- stock results for each number of users ----%
+        %---- stock results for each user ----%
         EE_op_NOMA_BD(i)=EE_NOMA_BD;
         EE_op_NOMA_conv(i)=EE_NOMA_conv;
         EE_op_OMA_BD(i)=EE_OMA_BD;
